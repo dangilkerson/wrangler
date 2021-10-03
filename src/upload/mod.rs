@@ -18,7 +18,8 @@ pub fn script(
 ) -> Result<()> {
     let worker_addr = format!(
         "https://api.cloudflare.com/client/v4/accounts/{}/workers/scripts/{}",
-        target.account_id, target.name,
+        target.account_id.load()?,
+        target.name,
     );
 
     let script_upload_form = form::build(target, asset_manifest, None)?;
@@ -37,24 +38,6 @@ pub fn script(
 
     if !res.status().is_success() {
         anyhow::bail!(error_msg(res.text()?))
-    }
-
-    if let Some(usage_model) = target.usage_model {
-        let addr = format!(
-            "https://api.cloudflare.com/client/v4/accounts/{}/workers/scripts/{}/usage-model",
-            target.account_id, target.name,
-        );
-
-        let res = client
-            .put(&addr)
-            .json(&serde_json::json!({
-                "usage_model": usage_model.as_ref()
-            }))
-            .send()?;
-
-        if !res.status().is_success() {
-            anyhow::bail!(error_msg(res.text()?))
-        }
     }
 
     Ok(())

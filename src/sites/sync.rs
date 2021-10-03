@@ -19,7 +19,6 @@ pub fn sync(
     namespace_id: &str,
     path: &Path,
 ) -> Result<(Vec<KeyValuePair>, Vec<String>, AssetManifest)> {
-    kv::validate_target(target)?;
     // First, find all changed files in given local directory (aka files that are now stale
     // in Workers KV).
 
@@ -27,7 +26,7 @@ pub fn sync(
     // Turn it into a HashSet. This will be used by upload() to figure out which
     // files to exclude from upload (because their current version already exists in
     // the Workers KV remote).
-    let client = http::cf_v4_client(&user)?;
+    let client = http::cf_v4_client(user)?;
     let remote_keys_iter = KeyList::new(target, client, namespace_id, None)?;
     let mut remote_keys: HashSet<String> = HashSet::new();
     for remote_key in remote_keys_iter {
@@ -39,14 +38,14 @@ pub fn sync(
         }
     }
 
-    let (pairs, asset_manifest, _): (Vec<KeyValuePair>, AssetManifest, _) =
+    let (diff_files_to_upload, asset_manifest, _): (Vec<KeyValuePair>, AssetManifest, _) =
         directory_keys_values(target, path, Some(&remote_keys))?;
 
     // Now delete files from Workers KV that exist in remote but no longer exist locally.
     // Get local keys
     let mut local_keys: HashSet<_> = HashSet::new();
-    for pair in pairs.iter() {
-        local_keys.insert(pair.key.clone());
+    for (_, asset_key) in asset_manifest.iter() {
+        local_keys.insert(asset_key.clone());
     }
 
     // Find keys that are present in remote but not present in local, and
@@ -57,5 +56,5 @@ pub fn sync(
         .collect();
 
     StdErr::success("Success");
-    Ok((pairs, to_delete, asset_manifest))
+    Ok((diff_files_to_upload, to_delete, asset_manifest))
 }
